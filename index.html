@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Format-Detektiv</title>
+<style>
+  :root {
+    --bg: #F1EFE8;
+    --surface: #FFFFFF;
+    --surface-alt: #E9E6DA;
+    --ink: #1C1B17;
+    --ink-soft: #6C6A5D;
+    --line: #DAD7C8;
+    --accent: #2F5D50;
+    --accent-strong: #21453B;
+    --accent-soft: #DDE8E1;
+    --warn: #A73B2A;
+    --warn-soft: #F5E1DA;
+    --mono-bg: #17180F;
+    --mono-fg: #E7E4D8;
+    --mono-dim: #8B8A7A;
+    --mono-accent: #8FD9B6;
+    --radius: 10px;
+    --shadow: 0 1px 2px rgba(20,20,10,0.06), 0 10px 28px -14px rgba(20,20,10,0.22);
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", Consolas, "Roboto Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16171A;
+      --surface: #1E2023;
+      --surface-alt: #262830;
+      --ink: #EDEBE3;
+      --ink-soft: #9C9B90;
+      --line: #33352E;
+      --accent: #6FCDAF;
+      --accent-strong: #8FE0C4;
+      --accent-soft: #1F332C;
+      --warn: #E2685A;
+      --warn-soft: #3A211C;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+  }
+  *:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .app { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
+
+  .masthead { margin-bottom: 32px; }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: .14em;
+    color: var(--accent); text-transform: uppercase;
+  }
+  h1 { font-size: clamp(26px, 5vw, 38px); line-height: 1.15; margin: 8px 0 10px; font-weight: 700; letter-spacing: -0.01em; }
+  .sub { color: var(--ink-soft); font-size: 15px; line-height: 1.55; max-width: 540px; margin: 0; }
+
+  .dropzone {
+    border: 1.5px dashed var(--line); border-radius: var(--radius); background: var(--surface);
+    padding: 48px 24px; text-align: center; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .dropzone:hover, .dropzone:focus-visible, .dropzone.drag {
+    border-color: var(--accent); background: var(--accent-soft); outline: none;
+  }
+  .dropzone svg { stroke: var(--accent); }
+  .dz-title { font-weight: 600; margin: 14px 0 4px; }
+  .dz-sub { color: var(--ink-soft); font-size: 13px; margin: 0; }
+
+  .result { margin-top: 40px; display: flex; flex-direction: column; gap: 20px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .result { animation: fadeUp .35s ease; }
+  }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  .result-top {
+    display: flex; gap: 18px; align-items: flex-start; background: var(--surface);
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow);
+  }
+  .preview {
+    width: 72px; height: 72px; border-radius: 8px; overflow: hidden; flex-shrink: 0;
+    background: var(--surface-alt); display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--line);
+  }
+  .preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .preview .glyph { font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; }
+
+  .headline { flex: 1; min-width: 0; }
+  .badge {
+    display: inline-block; font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+    letter-spacing: .05em; background: var(--accent); color: #fff; padding: 3px 8px; border-radius: 5px; margin-bottom: 6px;
+  }
+  .headline h2 { font-size: 19px; margin: 0 0 4px; line-height: 1.3; }
+  .filemeta { font-size: 12.5px; color: var(--ink-soft); word-break: break-word; line-height: 1.5; }
+
+  .btn-reset, .btn-ghost {
+    font-family: var(--font-sans); font-size: 13px; font-weight: 600; border: 1px solid var(--line);
+    background: var(--surface); color: var(--ink); padding: 8px 14px; border-radius: 7px; cursor: pointer;
+    transition: border-color .15s, color .15s; white-space: nowrap;
+  }
+  .btn-reset:hover, .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  .mismatch-banner {
+    background: var(--warn-soft); border: 1px solid var(--warn); color: var(--warn);
+    padding: 12px 16px; border-radius: var(--radius); font-size: 13.5px; line-height: 1.55;
+  }
+
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+  .panel h3 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: var(--ink-soft);
+    margin: 0 0 14px; font-family: var(--font-mono);
+  }
+
+  .compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .compare-item { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  .compare-item .ci-label { font-size: 11px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+  .compare-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13.5px; padding: 3px 0; }
+  .compare-row .val-claim { color: var(--ink-soft); text-align: right; }
+  .compare-row .val-real { font-weight: 600; text-align: right; }
+  .compare-row.mismatch .val-real { color: var(--warn); }
+
+  .detail-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 16px 24px; margin: 0; padding: 0; }
+  .detail-list .di { display: flex; flex-direction: column; gap: 3px; }
+  .detail-list dt { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-soft); margin: 0; }
+  .detail-list dd { margin: 0; font-size: 14.5px; font-weight: 500; }
+
+  ul.notes { margin: 16px 0 0; padding-top: 14px; border-top: 1px dashed var(--line); list-style: none; }
+  ul.notes li { font-size: 13.5px; color: var(--ink-soft); line-height: 1.55; margin-bottom: 6px; padding-left: 16px; position: relative; }
+  ul.notes li::before { content: "→"; position: absolute; left: 0; color: var(--accent); }
+
+  .panel-hex-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .panel-hex-head h3 { margin: 0; }
+
+  .hexviewer { background: var(--mono-bg); color: var(--mono-fg); border-radius: 8px; padding: 16px; overflow-x: auto; }
+  .hex-row { display: flex; gap: 18px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.9; white-space: nowrap; }
+  .hex-offset { color: var(--mono-dim); width: 44px; flex-shrink: 0; }
+  .hex-bytes { display: flex; gap: 6px; }
+  .hex-byte { display: inline-block; width: 20px; text-align: center; }
+  .hex-byte.sig { color: var(--mono-accent); font-weight: 700; }
+  .hex-ascii { color: var(--mono-dim); letter-spacing: 2px; }
+  .hex-ascii span.sig { color: var(--mono-accent); font-weight: 700; }
+  .hex-legend { margin-top: 12px; font-family: var(--font-mono); font-size: 11.5px; color: var(--mono-dim); line-height: 1.5; }
+
+  @media (max-width: 520px) {
+    .result-top { flex-direction: column; }
+    .btn-reset { align-self: flex-start; }
+    .hex-row { gap: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="masthead">
+    <span class="eyebrow">Format-Detektiv</span>
+    <h1>Was steckt wirklich in dieser Datei?</h1>
+    <p class="sub">Datei rein, Magic Bytes raus. Keine Vermutung – nur das, was tatsächlich in den ersten Bytes steht. Funktioniert bei Bildern, Vektoren, Schriften, PSD/AI und ein paar Exoten.</p>
+  </header>
+
+  <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Datei auswählen oder hierher ziehen">
+    <input type="file" id="fileInput" hidden accept="*/*">
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3"/>
+    </svg>
+    <p class="dz-title">Datei hierher ziehen oder klicken</p>
+    <p class="dz-sub">Egal was draufsteht – wir schauen, was wirklich drinsteckt</p>
+  </div>
+
+  <div id="result" class="result" hidden>
+
+    <div class="result-top">
+      <div class="preview" id="preview"></div>
+      <div class="headline">
+        <span class="badge" id="badgeFormat">—</span>
+        <h2 id="formatName">—</h2>
+        <p class="filemeta" id="fileMeta"></p>
+      </div>
+      <button class="btn-reset" id="resetBtn" type="button">Neue Datei</button>
+    </div>
+
+    <div id="mismatchBanner" class="mismatch-banner" hidden></div>
+
+    <section class="panel">
+      <h3>Abgleich</h3>
+      <div class="compare-grid" id="compareGrid"></div>
+    </section>
+
+    <section class="panel">
+      <h3>Technische Daten</h3>
+      <dl class="detail-list" id="detailList"></dl>
+      <ul class="notes" id="notesList" hidden></ul>
+    </section>
+
+    <section class="panel">
+      <div class="panel-hex-head">
+        <h3>Byte-Signatur</h3>
+        <button class="btn-ghost" id="copyBtn" type="button">Bericht kopieren</button>
+      </div>
+      <div class="hexviewer" id="hexViewer"></div>
+      <div class="hex-legend" id="hexLegend"></div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var PREFIX_SIZE = 5 * 1024 * 1024; // 5 MB reichen für Header-Scans, auch bei Animationen
+
+  // ---------- Byte-Helfer ----------
+  function matchSig(bytes, sig, offset) {
+    offset = offset || 0;
+    if (offset + sig.length > bytes.length) return false;
+    for (var i = 0; i < sig.length; i++) { if (bytes[offset + i] !== sig[i]) return false; }
+    return true;
+  }
+  function asciiStr(bytes, offset, len) {
+    len = Math.max(0, Math.min(len, bytes.length - offset));
+    var s = "";
+    for (var i = 0; i < len; i++) s += String.fromCharCode(bytes[offset + i]);
+    return s;
+  }
+  function decodeUTF8Prefix(bytes, maxLen) {
+    var end = Math.min(maxLen, bytes.length);
+    try { return new TextDecoder("utf-8", { fatal: false }).decode(bytes.slice(0, end)); }
+    catch (e) { return asciiStr(bytes, 0, end); }
+  }
+  function ru16BE(b, o) { return (b[o] << 8) | b[o + 1]; }
+  function ru32BE(b, o) { return ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0; }
+  function ru16LE(b, o) { return b[o] | (b[o + 1] << 8); }
+  function ru32LE(b, o) { return (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0; }
+  function ri32LE(b, o) { var v = ru32LE(b, o); return v > 0x7FFFFFFF ? v - 0x100000000 : v; }
+  function hexByte(v) { return v.toString(16).padStart(2, "0").toUpperCase(); }
+
+  function fmtBytes(n) {
+    if (n < 1024) return n + " B";
+    var units = ["KB", "MB", "GB", "TB"], u = -1, num = n;
+    do { num /= 1024; u++; } while (num >= 1024 && u < units.length - 1);
+    return num.toLocaleString("de-DE", { maximumFractionDigits: num < 10 ? 1 : 0 }) + " " + units[u];
+  }
+  function escapeHtml(s) {
+    var d = document.createElement("div");
+    d.textContent = s == null ? "" : String(s);
+    return d.innerHTML;
+  }
+
+  // ---------- Format-Erkennung ----------
+  function detectFormat(bytes) {
+    if (matchSig(bytes, [0x52,0x49,0x46,0x46]) && matchSig(bytes, [0x57,0x45,0x42,0x50], 8))
+      return { key:"WEBP", name:"WebP", ext:["webp"], mime:"image/webp", category:"Bild", sigRange:[8,12] };
+    if (matchSig(bytes, [0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A]))
+      return { key:"PNG", name:"Portable Network Graphics", ext:["png"], mime:"image/png", category:"Bild", sigRange:[0,8] };
+    if (matchSig(bytes, [0x00,0x00,0x00,0x0C,0x6A,0x50,0x20,0x20]))
+      return { key:"JP2", name:"JPEG 2000", ext:["jp2","j2k"], mime:"image/jp2", category:"Bild", sigRange:[0,8] };
+    if (matchSig(bytes, [0xFF,0xD8,0xFF]))
+      return { key:"JPEG", name:"JPEG", ext:["jpg","jpeg"], mime:"image/jpeg", category:"Bild", sigRange:[0,3] };
+    if (matchSig(bytes, [0x47,0x49,0x46,0x38,0x37,0x61]) || matchSig(bytes, [0x47,0x49,0x46,0x38,0x39,0x61]))
+      return { key:"GIF", name:"GIF (Graphics Interchange Format)", ext:["gif"], mime:"image/gif", category:"Bild", sigRange:[0,6] };
+    if (matchSig(bytes, [0x42,0x4D]))
+      return { key:"BMP", name:"Windows Bitmap", ext:["bmp"], mime:"image/bmp", category:"Bild", sigRange:[0,2] };
+    if (matchSig(bytes, [0x00,0x00,0x01,0x00]))
+      return { key:"ICO", name:"Windows-Icon", ext:["ico"], mime:"image/x-icon", category:"Bild", sigRange:[0,4] };
+    if (matchSig(bytes, [0x00,0x00,0x02,0x00]))
+      return { key:"CUR", name:"Windows-Cursor", ext:["cur"], mime:"image/x-icon", category:"Bild", sigRange:[0,4] };
+    if (matchSig(bytes, [0x49,0x49,0x2A,0x00]))
+      return { key:"TIFF", name:"TIFF", ext:["tif","tiff"], mime:"image/tiff", category:"Bild", byteOrder:"LE", sigRange:[0,4] };
+    if (matchSig(bytes, [0x4D,0x4D,0x00,0x2A]))
+      return { key:"TIFF", name:"TIFF", ext:["tif","tiff"], mime:"image/tiff", category:"Bild", byteOrder:"BE", sigRange:[0,4] };
+    if (matchSig(bytes, [0x38,0x42,0x50,0x53]))
+      return { key:"PSD", name:"Photoshop-Dokument", ext:["psd","psb"], mime:"image/vnd.adobe.photoshop", category:"Design", sigRange:[0,4] };
+    if (matchSig(bytes, [0x25,0x50,0x44,0x46]))
+      return { key:"PDF", name:"PDF", ext:["pdf","ai"], mime:"application/pdf", category:"Dokument", sigRange:[0,4] };
+    if (matchSig(bytes, [0x77,0x4F,0x46,0x46]))
+      return { key:"WOFF", name:"Web Open Font Format", ext:["woff"], mime:"font/woff", category:"Schrift", sigRange:[0,4] };
+    if (matchSig(bytes, [0x77,0x4F,0x46,0x32]))
+      return { key:"WOFF2", name:"Web Open Font Format 2", ext:["woff2"], mime:"font/woff2", category:"Schrift", sigRange:[0,4] };
+    if (matchSig(bytes, [0x4F,0x54,0x54,0x4F]))
+      return { key:"OTF", name:"OpenType-Schrift", ext:["otf"], mime:"font/otf", category:"Schrift", sigRange:[0,4] };
+    if (matchSig(bytes, [0x00,0x01,0x00,0x00]) || matchSig(bytes, [0x74,0x72,0x75,0x65]))
+      return { key:"TTF", name:"TrueType-Schrift", ext:["ttf"], mime:"font/ttf", category:"Schrift", sigRange:[0,4] };
+    if (matchSig(bytes, [0x50,0x4B,0x03,0x04]) || matchSig(bytes, [0x50,0x4B,0x05,0x06]) || matchSig(bytes, [0x50,0x4B,0x07,0x08]))
+      return { key:"ZIP", name:"ZIP-Container", ext:["zip"], mime:"application/zip", category:"Archiv", sigRange:[0,4] };
+    if (matchSig(bytes, [0x25,0x21]))
+      return { key:"PS", name:"PostScript / EPS", ext:["ps","eps"], mime:"application/postscript", category:"Dokument", sigRange:[0,2] };
+    if (matchSig(bytes, [0x66,0x74,0x79,0x70], 4)) {
+      var brand = asciiStr(bytes, 8, 4);
+      var map = { avif:"AVIF (Einzelbild)", avis:"AVIF (Bildsequenz)", heic:"HEIC", heix:"HEIC (erweitert)",
+                  heim:"HEIC (Multi-Image)", heis:"HEIC (Scalable)", mif1:"HEIF (Standbild)", msf1:"HEIF (Bildsequenz)" };
+      if (map[brand]) {
+        var isAvif = brand.indexOf("av") === 0;
+        return { key:"HEIF", name: map[brand], ext:[isAvif ? "avif" : "heic"], mime: isAvif ? "image/avif" : "image/heic", category:"Bild", sigRange:[4,12] };
+      }
+      return { key:"ISOBMFF", name:'ISO-Media-Container (Marke „' + brand.trim() + '“)', ext:[], mime:"", category:"Video/Audio", sigRange:[4,12] };
+    }
+    var textPeek = decodeUTF8Prefix(bytes, 1000);
+    if (/<svg[\s>]/i.test(textPeek))
+      return { key:"SVG", name:"SVG (Scalable Vector Graphics)", ext:["svg"], mime:"image/svg+xml", category:"Bild", sigRange:[0,0], textBased:true };
+    return null;
+  }
+
+  // ---------- Format-spezifische Detailauswertung ----------
+  function parsePNG(bytes) {
+    var details = [], notes = [];
+    var offset = 8, chunkCount = 0;
+    var width, height, bitDepth, colorType, interlace;
+    var hasTrns = false, srgb = false, iccProfile = false, softwareStr = null;
+    var colorTypeNames = { 0:"Graustufen", 2:"RGB (Echtfarbe)", 3:"Indiziert (Palette)", 4:"Graustufen + Alpha", 6:"RGB + Alpha" };
+    while (offset + 8 <= bytes.length && chunkCount < 60) {
+      var len = ru32BE(bytes, offset);
+      var type = asciiStr(bytes, offset + 4, 4);
+      var dataStart = offset + 8;
+      if (type === "IHDR") {
+        width = ru32BE(bytes, dataStart);
+        height = ru32BE(bytes, dataStart + 4);
+        bitDepth = bytes[dataStart + 8];
+        colorType = bytes[dataStart + 9];
+        interlace = bytes[dataStart + 12];
+      } else if (type === "tRNS") { hasTrns = true; }
+      else if (type === "sRGB") { srgb = true; }
+      else if (type === "iCCP") { iccProfile = true; }
+      else if ((type === "tEXt" || type === "iTXt") && !softwareStr) {
+        var k = dataStart;
+        while (k < dataStart + len && bytes[k] !== 0) k++;
+        var keyword = asciiStr(bytes, dataStart, k - dataStart);
+        if (/software/i.test(keyword)) {
+          var valStart = k + 1;
+          softwareStr = asciiStr(bytes, valStart, Math.min(len - (valStart - dataStart), 60)).replace(/\0/g, "").trim();
+        }
+      }
+      if (type === "IDAT" || type === "IEND") break;
+      offset = dataStart + len + 4;
+      chunkCount++;
+    }
+    details.push({ label:"Abmessungen", value: width + " × " + height + " px" });
+    details.push({ label:"Farbmodus", value: (colorTypeNames[colorType] || "Unbekannt") + " · " + bitDepth + " Bit/Kanal" });
+    details.push({ label:"Alpha-Kanal", value: (colorType === 4 || colorType === 6) ? "Ja, eingebaut" : (hasTrns ? "Ja, über tRNS-Chunk" : "Nein") });
+    details.push({ label:"Interlacing", value: interlace === 1 ? "Adam7 (interlaced)" : "Keins" });
+    if (srgb) details.push({ label:"Farbraum", value:"sRGB (explizit markiert)" });
+    else if (iccProfile) details.push({ label:"Farbraum", value:"Eingebettetes ICC-Profil" });
+    if (softwareStr) notes.push("Erstellt/exportiert mit: " + softwareStr);
+    return { details: details, notes: notes };
+  }
+
+  function parseJPEG(bytes) {
+    var details = [], notes = [];
+    var hasJFIF = false, hasExif = false, hasXMP = false, isAdobe = false, adobeTransform = null;
+    var sofType = null, width = null, height = null, numComponents = null;
+    var offset = 2;
+    while (offset + 4 <= bytes.length) {
+      if (bytes[offset] !== 0xFF) { offset++; continue; }
+      var marker = bytes[offset + 1];
+      if (marker === 0xFF) { offset++; continue; }
+      if (marker === 0xD8 || marker === 0x01 || (marker >= 0xD0 && marker <= 0xD7)) { offset += 2; continue; }
+      if (marker === 0xD9) break;
+      var segLen = ru16BE(bytes, offset + 2);
+      var dataStart = offset + 4;
+      if (marker === 0xE0) {
+        if (asciiStr(bytes, dataStart, 4) === "JFIF") hasJFIF = true;
+      } else if (marker === 0xE1) {
+        if (asciiStr(bytes, dataStart, 4) === "Exif") hasExif = true;
+        if (asciiStr(bytes, dataStart, 29).indexOf("ns.adobe.com/xap") !== -1) hasXMP = true;
+      } else if (marker === 0xEE) {
+        if (asciiStr(bytes, dataStart, 5) === "Adobe") { isAdobe = true; adobeTransform = bytes[dataStart + 11]; }
+      } else if (marker >= 0xC0 && marker <= 0xCF && marker !== 0xC4 && marker !== 0xC8 && marker !== 0xCC) {
+        sofType = marker;
+        height = ru16BE(bytes, dataStart + 1);
+        width = ru16BE(bytes, dataStart + 3);
+        numComponents = bytes[dataStart + 5];
+        break;
+      } else if (marker === 0xDA) { break; }
+      offset = dataStart + segLen - 2;
+    }
+    var sofNames = { 0xC0:"Baseline (sequenziell)", 0xC1:"Extended Sequential", 0xC2:"Progressive", 0xC3:"Lossless" };
+    details.push({ label:"Abmessungen", value: (width && height) ? (width + " × " + height + " px") : "nicht ermittelbar" });
+    if (sofType != null) details.push({ label:"Kodierung", value: sofNames[sofType] || ("Marker 0x" + sofType.toString(16)) });
+    if (numComponents != null) {
+      var compNote = numComponents === 1 ? "Graustufen" : numComponents === 3 ? "YCbCr/RGB (Farbe)" : numComponents === 4 ? "CMYK/YCCK (4 Kanäle)" : (numComponents + " Kanäle");
+      details.push({ label:"Farbkanäle", value: numComponents + " · " + compNote });
+    }
+    var metaTags = [];
+    if (hasJFIF) metaTags.push("JFIF");
+    if (hasExif) metaTags.push("EXIF");
+    if (hasXMP) metaTags.push("XMP");
+    details.push({ label:"Metadaten", value: metaTags.length ? metaTags.join(", ") : "Keine erkannt" });
+    if (isAdobe) {
+      var transformNames = { 0:"CMYK/unkodiert", 1:"YCbCr", 2:"YCCK" };
+      notes.push("Adobe-Marker (APP14) gefunden" + (adobeTransform != null ? (" – Farbtransformation: " + (transformNames[adobeTransform] || adobeTransform)) : "") + ".");
+    }
+    if (numComponents === 4) notes.push("4 Farbkanäle deuten auf CMYK hin – Browser stellen das oft falsch dar, für Web besser nach RGB konvertieren.");
+    return { details: details, notes: notes };
+  }
+
+  function parseGIF(bytes) {
+    var details = [], notes = [];
+    var width = ru16LE(bytes, 6), height = ru16LE(bytes, 8);
+    var packed = bytes[10];
+    var hasGCT = (packed & 0x80) !== 0;
+    var gctSize = hasGCT ? (2 << (packed & 0x07)) : 0;
+    var offset = 13 + (hasGCT ? gctSize * 3 : 0);
+    var frameCount = 0, hasTransparency = false, loopCount = null;
+    try {
+      while (offset < bytes.length) {
+        var b = bytes[offset];
+        if (b === 0x21) {
+          var label = bytes[offset + 1];
+          offset += 2;
+          if (label === 0xF9) {
+            var blockSize = bytes[offset];
+            var flags = bytes[offset + 1];
+            if (flags & 0x01) hasTransparency = true;
+            offset += 1 + blockSize + 1;
+          } else if (label === 0xFF) {
+            var appBlockSize = bytes[offset];
+            var appId = asciiStr(bytes, offset + 1, 11);
+            offset += 1 + appBlockSize;
+            while (offset < bytes.length && bytes[offset] !== 0) {
+              var sub = bytes[offset];
+              if (appId.indexOf("NETSCAPE") !== -1 && sub >= 3) loopCount = ru16LE(bytes, offset + 2);
+              offset += 1 + sub;
+            }
+            offset += 1;
+          } else {
+            while (offset < bytes.length && bytes[offset] !== 0) offset += 1 + bytes[offset];
+            offset += 1;
+          }
+        } else if (b === 0x2C) {
+          frameCount++;
+          var lctFlags = bytes[offset + 9];
+          var hasLCT = (lctFlags & 0x80) !== 0;
+          var lctSize = hasLCT ? (2 << (lctFlags & 0x07)) : 0;
+          offset += 10 + (hasLCT ? lctSize * 3 : 0);
+          offset += 1;
+          while (offset < bytes.length && bytes[offset] !== 0) offset += 1 + bytes[offset];
+          offset += 1;
+        } else { break; }
+        if (frameCount > 2000) break;
+      }
+    } catch (e) { notes.push("Block-Struktur nach dem Header konnte nicht vollständig gelesen werden."); }
+    details.push({ label:"Abmessungen", value: width + " × " + height + " px" });
+    details.push({ label:"Farbpalette", value: hasGCT ? (gctSize + " Farben (global)") : "Keine globale Palette" });
+    details.push({ label:"Transparenz", value: hasTransparency ? "Ja" : "Nein" });
+    var animValue = frameCount > 1
+      ? ("Ja – " + frameCount + " Frames" + (loopCount != null ? (loopCount === 0 ? " · endlos" : (" · " + loopCount + "× Wiederholung")) : ""))
+      : "Nein, Standbild";
+    details.push({ label:"Animation", value: animValue });
+    return { details: details, notes: notes };
+  }
+
+  function parseBMP(bytes) {
+    var details = [], notes = [];
+    var dibSize = ru32LE(bytes, 14);
+    var width, height, bpp, compression, topDown = false;
+    if (dibSize >= 40) {
+      width = ri32LE(bytes, 18);
+      var rawHeight = ri32LE(bytes, 22);
+      topDown = rawHeight < 0;
+      height = Math.abs(rawHeight);
+      bpp = ru16LE(bytes, 28);
+      compression = ru32LE(bytes, 30);
+    } else {
+      width = ru16LE(bytes, 18);
+      height = ru16LE(bytes, 20);
+      bpp = ru16LE(bytes, 24);
+      compression = 0;
+    }
+    var compNames = { 0:"Unkomprimiert (RGB)", 1:"RLE 8-Bit", 2:"RLE 4-Bit", 3:"Bitfields", 4:"JPEG (eingebettet)", 5:"PNG (eingebettet)" };
+    details.push({ label:"Abmessungen", value: width + " × " + height + " px" });
+    details.push({ label:"Farbtiefe", value: bpp + " Bit" + (bpp === 32 ? " (Alpha möglich)" : "") });
+    details.push({ label:"Kompression", value: compNames[compression] || ("Typ " + compression) });
+    details.push({ label:"Zeilenrichtung", value: topDown ? "Top-Down" : "Bottom-Up (Standard)" });
+    return { details: details, notes: notes };
+  }
+
+  function parseWEBP(bytes) {
+    var details = [], notes = [];
+    var offset = 12;
+    var subFormat = null, width = null, height = null, hasAlpha = null, isAnimated = false;
+    var hasICC = false, hasEXIF = false, hasXMP = false;
+    while (offset + 8 <= bytes.length) {
+      var fourcc = asciiStr(bytes, offset, 4);
+      var size = ru32LE(bytes, offset + 4);
+      var dataStart = offset + 8;
+      if (fourcc === "VP8X") {
+        subFormat = "Extended (VP8X)";
+        var flags = bytes[dataStart];
+        hasICC = (flags & 0x20) !== 0;
+        hasAlpha = (flags & 0x10) !== 0;
+        hasEXIF = (flags & 0x08) !== 0;
+        hasXMP = (flags & 0x04) !== 0;
+        isAnimated = (flags & 0x02) !== 0;
+        width = 1 + (bytes[dataStart + 4] | (bytes[dataStart + 5] << 8) | (bytes[dataStart + 6] << 16));
+        height = 1 + (bytes[dataStart + 7] | (bytes[dataStart + 8] << 8) | (bytes[dataStart + 9] << 16));
+      } else if (fourcc === "VP8 " && width == null) {
+        subFormat = subFormat || "Verlustbehaftet (VP8)";
+        if (bytes[dataStart + 3] === 0x9D && bytes[dataStart + 4] === 0x01 && bytes[dataStart + 5] === 0x2A) {
+          width = ru16LE(bytes, dataStart + 6) & 0x3FFF;
+          height = ru16LE(bytes, dataStart + 8) & 0x3FFF;
+        }
+      } else if (fourcc === "VP8L" && width == null) {
+        subFormat = subFormat || "Verlustfrei (VP8L)";
+        var b0 = bytes[dataStart + 1], b1 = bytes[dataStart + 2], b2 = bytes[dataStart + 3], b3 = bytes[dataStart + 4];
+        width = 1 + (b0 | ((b1 & 0x3F) << 8));
+        height = 1 + ((b1 >> 6) | (b2 << 2) | ((b3 & 0x0F) << 10));
+        hasAlpha = ((b3 >> 4) & 1) === 1;
+      }
+      offset = dataStart + size + (size % 2);
+    }
+    details.push({ label:"Abmessungen", value: (width && height) ? (width + " × " + height + " px") : "nicht ermittelbar" });
+    details.push({ label:"Variante", value: subFormat || "Unbekannt" });
+    details.push({ label:"Alpha-Kanal", value: hasAlpha === true ? "Ja" : hasAlpha === false ? "Nein" : "nicht ermittelbar" });
+    details.push({ label:"Animation", value: isAnimated ? "Ja" : "Nein" });
+    if (hasICC) notes.push("Enthält ein eingebettetes ICC-Profil.");
+    if (hasEXIF) notes.push("Enthält EXIF-Metadaten.");
+    if (hasXMP) notes.push("Enthält XMP-Metadaten.");
+    return { details: details, notes: notes };
+  }
+
+  function parseICO(bytes) {
+    var details = [], notes = [];
+    var count = ru16LE(bytes, 4);
+    var sizes = [];
+    for (var i = 0; i < count && i < 50; i++) {
+      var eo = 6 + i * 16;
+      var w = bytes[eo]; if (w === 0) w = 256;
+      var h = bytes[eo + 1]; if (h === 0) h = 256;
+      sizes.push(w + "×" + h);
+    }
+    details.push({ label:"Enthaltene Icons", value: count });
+    if (sizes.length) details.push({ label:"Größen", value: sizes.join(", ") });
+    return { details: details, notes: notes };
+  }
+
+  function parseTIFF(bytes, format) {
+    var details = [], notes = [];
+    var le = format.byteOrder === "LE";
+    var r16 = function (o) { return le ? (bytes[o] | (bytes[o + 1] << 8)) : ((bytes[o] << 8) | bytes[o + 1]); };
+    var r32 = function (o) { return le ? ru32LE(bytes, o) : ru32BE(bytes, o); };
+    details.push({ label:"Byte-Reihenfolge", value: le ? "Little-Endian (Intel)" : "Big-Endian (Motorola)" });
+    try {
+      var ifdOffset = r32(4);
+      var numEntries = r16(ifdOffset);
+      var width = null, height = null, bits = null;
+      for (var i = 0; i < numEntries; i++) {
+        var eo = ifdOffset + 2 + i * 12;
+        var tag = r16(eo), type = r16(eo + 2), count = r32(eo + 4);
+        var value = null;
+        if (type === 3) {
+          value = (count === 1) ? r16(eo + 8) : r16(r32(eo + 8));
+        } else if (type === 4) {
+          value = (count === 1) ? r32(eo + 8) : r32(r32(eo + 8));
+        }
+        if (tag === 256) width = value;
+        if (tag === 257) height = value;
+        if (tag === 258) bits = value;
+      }
+      if (width && height) details.push({ label:"Abmessungen", value: width + " × " + height + " px" });
+      if (bits) details.push({ label:"Bittiefe", value: bits + " Bit" });
+    } catch (e) {
+      notes.push("IFD-Struktur konnte nicht vollständig gelesen werden.");
+    }
+    return { details: details, notes: notes };
+  }
+
+  function parsePSD(bytes) {
+    var details = [], notes = [];
+    var version = ru16BE(bytes, 4);
+    var channels = ru16BE(bytes, 12);
+    var height = ru32BE(bytes, 14);
+    var width = ru32BE(bytes, 18);
+    var depth = ru16BE(bytes, 22);
+    var colorMode = ru16BE(bytes, 24);
+    var modeNames = { 0:"Bitmap", 1:"Graustufen", 2:"Indiziert", 3:"RGB", 4:"CMYK", 7:"Multichannel", 8:"Duotone", 9:"Lab" };
+    details.push({ label:"Variante", value: version === 2 ? "PSB (Großes Dokument)" : "PSD (Standard)" });
+    details.push({ label:"Abmessungen", value: width + " × " + height + " px" });
+    details.push({ label:"Kanäle", value: channels });
+    details.push({ label:"Farbmodus", value: (modeNames[colorMode] || "Unbekannt") + " · " + depth + " Bit/Kanal" });
+    return { details: details, notes: notes };
+  }
+
+  function parsePDF(bytes) {
+    var details = [], notes = [];
+    var head = asciiStr(bytes, 0, 16);
+    var m = head.match(/%PDF-(\d\.\d)/);
+    details.push({ label:"PDF-Version", value: m ? m[1] : "unbekannt" });
+    var peek = decodeUTF8Prefix(bytes, 20000);
+    if (/Illustrator/i.test(peek)) notes.push("Enthält Illustrator-Marker – vermutlich eine .ai-Datei. Moderne .ai-Dateien sind intern PDF-kompatibel gespeichert.");
+    return { details: details, notes: notes };
+  }
+
+  function parsePS() {
+    return { details: [], notes: ["Klassisches PostScript/EPS – kein Pixelbild, sondern Vektor-/Druckbefehle. Alte .ai-Dateien (vor Illustrator 9) sehen so aus; neuere sind PDF-basiert."] };
+  }
+
+  function parseZIP() {
+    return { details: [{ label:"Signatur", value:"PK (ZIP Local File Header)" }],
+             notes: ["Könnte u. a. DOCX, XLSX, EPUB, eine gepackte Schriftfamilie oder ein Sketch-Dokument sein – für die genaue Bestimmung müsste der Inhalt (z. B. eine mimetype-Datei) geprüft werden."] };
+  }
+
+  function parseHEIF(bytes, format) {
+    return { details: [{ label:"Container", value:"ISO-Base-Media (ftyp-Box)" }],
+             notes: ["Abmessungen stecken tief verschachtelt im Container (ispe-Box) – dafür bräuchte es einen vollständigen Parser, das sprengt hier den Rahmen."] };
+  }
+
+  function parseISOBMFF() {
+    return { details: [], notes: ["Kein klassisches Bildformat – eher ein Video-/Audio-Container. Ohne vollständigen Decoder lässt sich daraus nicht mehr rauslesen."] };
+  }
+
+  function parseFontGeneric(bytes, format) {
+    var details = [], notes = [];
+    try {
+      if (format.key === "WOFF" || format.key === "WOFF2") {
+        var flavor = asciiStr(bytes, 4, 4);
+        details.push({ label:"Ursprüngliches Format", value: flavor === "OTTO" ? "OpenType (CFF)" : "TrueType-Outlines" });
+        if (format.key === "WOFF") details.push({ label:"Tabellen", value: ru16BE(bytes, 12) });
+      } else {
+        details.push({ label:"Tabellen", value: ru16BE(bytes, 4) });
+      }
+    } catch (e) {}
+    notes.push("Schriftdatei – kein Bildformat. Name und Stilinfos stecken in der „name“-Tabelle, die hier nicht ausgelesen wird.");
+    return { details: details, notes: notes };
+  }
+
+  function parseSVG(bytes) {
+    var details = [], notes = [];
+    var text = decodeUTF8Prefix(bytes, 4000);
+    var wm = text.match(/\bwidth=["']([^"']+)["']/i);
+    var hm = text.match(/\bheight=["']([^"']+)["']/i);
+    var vb = text.match(/\bviewBox=["']([^"']+)["']/i);
+    if (wm) details.push({ label:"Breite (Attribut)", value: wm[1] });
+    if (hm) details.push({ label:"Höhe (Attribut)", value: hm[1] });
+    if (vb) details.push({ label:"viewBox", value: vb[1] });
+    if (!wm && !hm && !vb) notes.push("Keine Maße im Root-Element gefunden – Größe wird vermutlich vom umgebenden Kontext bestimmt.");
+    if (/<script/i.test(text)) notes.push("Enthält <script> – bei SVGs aus unbekannter Quelle Vorsicht beim Einbetten.");
+    return { details: details, notes: notes };
+  }
+
+  var PARSERS = {
+    PNG: parsePNG, JPEG: parseJPEG, GIF: parseGIF, BMP: parseBMP, WEBP: parseWEBP,
+    ICO: parseICO, CUR: parseICO, TIFF: parseTIFF, PSD: parsePSD, PDF: parsePDF,
+    PS: parsePS, ZIP: parseZIP, HEIF: parseHEIF, ISOBMFF: parseISOBMFF,
+    WOFF: parseFontGeneric, WOFF2: parseFontGeneric, OTF: parseFontGeneric, TTF: parseFontGeneric,
+    SVG: parseSVG
+  };
+
+  var RENDERABLE = ["PNG", "JPEG", "GIF", "BMP", "WEBP", "ICO", "SVG", "HEIF"];
+
+  // ---------- UI-Verdrahtung ----------
+  var dropzone = document.getElementById("dropzone");
+  var fileInput = document.getElementById("fileInput");
+  var resultEl = document.getElementById("result");
+  var previewEl = document.getElementById("preview");
+  var badgeFormat = document.getElementById("badgeFormat");
+  var formatNameEl = document.getElementById("formatName");
+  var fileMetaEl = document.getElementById("fileMeta");
+  var mismatchBanner = document.getElementById("mismatchBanner");
+  var compareGrid = document.getElementById("compareGrid");
+  var detailList = document.getElementById("detailList");
+  var notesList = document.getElementById("notesList");
+  var hexViewer = document.getElementById("hexViewer");
+  var hexLegend = document.getElementById("hexLegend");
+  var copyBtn = document.getElementById("copyBtn");
+  var resetBtn = document.getElementById("resetBtn");
+  var currentReportText = "";
+
+  dropzone.addEventListener("click", function () { fileInput.click(); });
+  dropzone.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); }
+  });
+  dropzone.addEventListener("dragover", function (e) { e.preventDefault(); dropzone.classList.add("drag"); });
+  dropzone.addEventListener("dragleave", function () { dropzone.classList.remove("drag"); });
+  dropzone.addEventListener("drop", function (e) {
+    e.preventDefault();
+    dropzone.classList.remove("drag");
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener("change", function (e) {
+    if (e.target.files && e.target.files[0]) handleFile(e.target.files[0]);
+  });
+  resetBtn.addEventListener("click", function () {
+    resultEl.hidden = true;
+    dropzone.hidden = false;
+    fileInput.value = "";
+  });
+  copyBtn.addEventListener("click", function () {
+    navigator.clipboard.writeText(currentReportText).then(function () {
+      copyBtn.textContent = "Kopiert ✓";
+      setTimeout(function () { copyBtn.textContent = "Bericht kopieren"; }, 1600);
+    }).catch(function () {
+      copyBtn.textContent = "Kopieren fehlgeschlagen";
+      setTimeout(function () { copyBtn.textContent = "Bericht kopieren"; }, 1600);
+    });
+  });
+
+  function handleFile(file) {
+    dropzone.hidden = true;
+    var slice = file.slice(0, PREFIX_SIZE);
+    var reader = new FileReader();
+    reader.onload = function () {
+      var bytes = new Uint8Array(reader.result);
+      var format = null;
+      try { format = detectFormat(bytes); } catch (e) { format = null; }
+      var parsed = { details: [], notes: [] };
+      if (format && PARSERS[format.key]) {
+        try { parsed = PARSERS[format.key](bytes, format); }
+        catch (e) { parsed = { details: [], notes: ["Technische Details konnten nicht vollständig ausgelesen werden."] }; }
+      }
+      render(file, bytes, format, parsed);
+      resultEl.hidden = false;
+    };
+    reader.readAsArrayBuffer(slice);
+  }
+
+  function glyphHtml(format) {
+    var label = (format && format.ext && format.ext[0]) ? format.ext[0].toUpperCase() : "?";
+    return '<span class="glyph">' + escapeHtml(label) + "</span>";
+  }
+
+  function compareItem(label, claim, real, matches) {
+    var note = matches === true ? " ✓" : matches === false ? " ≠" : "";
+    var div = document.createElement("div");
+    div.className = "compare-item";
+    div.innerHTML =
+      '<div class="ci-label">' + escapeHtml(label) + '</div>' +
+      '<div class="compare-row"><span>Behauptet</span><span class="val-claim">' + escapeHtml(claim) + '</span></div>' +
+      '<div class="compare-row' + (matches === false ? " mismatch" : "") + '"><span>Erkannt</span><span class="val-real">' + escapeHtml(real) + note + '</span></div>';
+    return div;
+  }
+
+  function buildReportText(file, format, parsed, extMatches) {
+    var lines = [];
+    lines.push("FORMAT-DETEKTIV — Bericht");
+    lines.push("Datei: " + file.name + " (" + fmtBytes(file.size) + ")");
+    lines.push("Erkanntes Format: " + (format ? format.name + " [" + format.key + "]" : "Unbekannt"));
+    lines.push("MIME (korrekt): " + (format && format.mime ? format.mime : "—") + " · MIME (Browser): " + (file.type || "—"));
+    if (extMatches === false) lines.push("⚠ Dateiendung passt nicht zum tatsächlichen Format.");
+    parsed.details.forEach(function (d) { lines.push("- " + d.label + ": " + d.value); });
+    if (parsed.notes.length) {
+      lines.push("Hinweise:");
+      parsed.notes.forEach(function (n) { lines.push("  • " + n); });
+    }
+    return lines.join("\n");
+  }
+
+  function renderHex(bytes, format) {
+    var n = Math.min(32, bytes.length);
+    var sigRange = (format && format.sigRange) ? format.sigRange : [0, 0];
+    var rows = Math.ceil(n / 16), html = "";
+    for (var row = 0; row < rows; row++) {
+      var start = row * 16, end = Math.min(start + 16, n);
+      var hexCells = "", asciiCells = "";
+      for (var i = start; i < end; i++) {
+        var isSig = i >= sigRange[0] && i < sigRange[1];
+        hexCells += '<span class="hex-byte' + (isSig ? " sig" : "") + '">' + hexByte(bytes[i]) + "</span>";
+        var c = bytes[i];
+        var ch = (c >= 32 && c < 127) ? String.fromCharCode(c) : ".";
+        asciiCells += '<span class="' + (isSig ? "sig" : "") + '">' + escapeHtml(ch) + "</span>";
+      }
+      html += '<div class="hex-row"><span class="hex-offset">' + start.toString(16).padStart(4, "0").toUpperCase() +
+              '</span><span class="hex-bytes">' + hexCells + '</span><span class="hex-ascii">' + asciiCells + "</span></div>";
+    }
+    hexViewer.innerHTML = html;
+    hexLegend.textContent = format
+      ? ("Hervorgehoben: die Bytes, an denen „" + format.name + "“ zweifelsfrei erkennbar ist.")
+      : ("Keine bekannte Signatur unter den ersten " + n + " Bytes gefunden – schau selbst, ob dir was auffällt.");
+  }
+
+  function render(file, bytes, format, parsed) {
+    var fmt = format || { key: null, name: "Unbekanntes Format", ext: [], mime: "", category: null, sigRange: [0, 0] };
+
+    previewEl.innerHTML = "";
+    if (format && RENDERABLE.indexOf(format.key) !== -1) {
+      var img = document.createElement("img");
+      img.alt = fmt.name;
+      img.onerror = function () { previewEl.innerHTML = glyphHtml(fmt); };
+      img.src = URL.createObjectURL(file);
+      previewEl.appendChild(img);
+    } else {
+      previewEl.innerHTML = glyphHtml(fmt);
+    }
+
+    badgeFormat.textContent = fmt.key || "???";
+    formatNameEl.textContent = fmt.name || "Unbekanntes Format";
+    fileMetaEl.textContent = file.name + " · " + fmtBytes(file.size) +
+      (fmt.category ? " · Kategorie: " + fmt.category : "") +
+      " · Browser-MIME: " + (file.type || "keine Angabe");
+
+    var dotIdx = file.name.lastIndexOf(".");
+    var claimedExt = dotIdx > -1 ? file.name.slice(dotIdx + 1).toLowerCase() : "";
+    var extList = fmt.ext || [];
+    var extMatches = (format && extList.length && claimedExt) ? (extList.indexOf(claimedExt) !== -1) : null;
+    var mimeMatches = (format && file.type) ? (file.type === fmt.mime) : null;
+
+    compareGrid.innerHTML = "";
+    compareGrid.appendChild(compareItem(
+      "Dateiendung",
+      claimedExt ? ("." + claimedExt) : "(keine)",
+      format ? ("." + (extList[0] || "?")) : "—",
+      extMatches
+    ));
+    compareGrid.appendChild(compareItem(
+      "MIME-Typ",
+      file.type || "(keine Angabe)",
+      fmt.mime || "—",
+      mimeMatches
+    ));
+
+    if (extMatches === false) {
+      mismatchBanner.hidden = false;
+      mismatchBanner.textContent = 'Die Datei heißt „.' + claimedExt + '“, ist laut Byte-Signatur aber tatsächlich: ' + fmt.name + '. Umbenennen ändert nur den Namen, nicht den Inhalt.';
+    } else {
+      mismatchBanner.hidden = true;
+    }
+
+    detailList.innerHTML = "";
+    if (!format) {
+      var div = document.createElement("div");
+      div.className = "di";
+      div.innerHTML = "<dt>Status</dt><dd>Keine bekannte Signatur erkannt</dd>";
+      detailList.appendChild(div);
+    } else {
+      parsed.details.forEach(function (d) {
+        var el = document.createElement("div");
+        el.className = "di";
+        el.innerHTML = "<dt>" + escapeHtml(d.label) + "</dt><dd>" + escapeHtml(d.value) + "</dd>";
+        detailList.appendChild(el);
+      });
+    }
+
+    var noteTexts = parsed.notes.slice();
+    if (!format) noteTexts.push("Passt zu keiner der geprüften Signaturen (PNG, JPEG, GIF, BMP, WEBP, TIFF, ICO/CUR, PDF, PSD, Schriftformate, SVG, ZIP, HEIF/AVIF, PS/EPS). Wirf einen Blick auf die Bytes unten – vielleicht erkennst du es selbst.");
+    notesList.hidden = noteTexts.length === 0;
+    notesList.innerHTML = noteTexts.map(function (n) { return "<li>" + escapeHtml(n) + "</li>"; }).join("");
+
+    renderHex(bytes, format);
+    currentReportText = buildReportText(file, format, parsed, extMatches);
+  }
+})();
+</script>
+</body>
+</html>
